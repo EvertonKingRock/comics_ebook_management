@@ -178,7 +178,7 @@ COMICS_ROOT=G:\Comics
 SUMATRA_PATH=C:\Users\<使用者>\AppData\Local\SumatraPDF\SumatraPDF.exe
 
 # 網頁伺服器埠號（僅本機 127.0.0.1）
-PORT=8000
+PORT=8085
 
 # 分類：資料夾名稱:顯示名稱（依此順序顯示）
 CATEGORY_MAP=HK:香港,Japan:日本,TW:台灣,US:美國
@@ -214,7 +214,7 @@ SCAN_ON_STARTUP=true
 ```
 ┌──────────────────────── 本機 PC ────────────────────────┐
 │                                                          │
-│  瀏覽器 (http://127.0.0.1:8000)                          │
+│  瀏覽器 (http://127.0.0.1:8085)                          │
 │    └─ React + Vite + TypeScript + Tailwind + shadcn/ui   │
 │                │ REST API (JSON)                         │
 │                ▼                                         │
@@ -372,7 +372,7 @@ comics_management/
 3. 首次執行：建立 Python 虛擬環境（`.venv`）並安裝套件。
 4. 首次執行或前端有更新：安裝前端套件並編譯（`npm install && npm run build`）。
 5. 啟動 FastAPI 伺服器（`127.0.0.1:PORT`）。
-6. 自動開啟瀏覽器至 `http://127.0.0.1:8000`。
+6. 自動開啟瀏覽器至 `http://127.0.0.1:8085`。
 7. 關閉命令視窗即停止服務。
 
 ---

@@ -83,7 +83,7 @@ def load_settings() -> Settings:
         comics_root=Path(os.getenv("COMICS_ROOT", r"G:\Comics").strip()),
         sumatra_path=sumatra,
         sevenzip_path=sevenzip,
-        port=int(os.getenv("PORT", "8000")),
+        port=int(os.getenv("PORT", "8085")),
         category_map=categories,
         file_types=types,
         scan_on_startup=_bool(os.getenv("SCAN_ON_STARTUP"), True),

@@ -26,7 +26,7 @@
    - 由 `.env.example` 建立 `.env`（之後不會覆蓋）
    - 建立 Python 虛擬環境並安裝套件（`requirements.txt` 有變更時會自動重新安裝）
    - 安裝並編譯前端（前端原始碼有變更時會自動重新編譯）
-   - 啟動伺服器並在可以連線後自動開啟瀏覽器（預設 `http://localhost:8000`）
+   - 啟動伺服器並在可以連線後自動開啟瀏覽器（預設 `http://localhost:8085`）
 3. 關閉命令視窗即停止服務。
 
 小提示：
@@ -50,7 +50,7 @@
 | `COMICS_ROOT` | 漫畫來源資料夾 | `G:\Comics` |
 | `SUMATRA_PATH` | SumatraPDF 路徑（留空自動尋找） | （空） |
 | `SEVENZIP_PATH` | 7-Zip 路徑，用於 RAR／7Z 封面（留空自動尋找） | （空） |
-| `PORT` | 埠號 | `8000` |
+| `PORT` | 埠號 | `8085` |
 | `CATEGORY_MAP` | 分類資料夾:顯示名稱 | `HK:香港,Japan:日本,TW:台灣,US:美國` |
 | `FILE_TYPES` | 納入管理的副檔名 | `pdf,epub,zip,cbz,rar,cbr,7z,mobi` |
 | `SCAN_ON_STARTUP` | 啟動時自動增量掃描 | `true` |
@@ -87,9 +87,9 @@ COMICS_ROOT\
 # 後端（開發模式）
 python -m venv .venv
 .venv\Scripts\pip install -r backend\requirements.txt
-.venv\Scripts\python -m uvicorn backend.main:app --reload --port 8000
+.venv\Scripts\python -m uvicorn backend.main:app --reload --port 8085
 
-# 前端（開發模式，API 代理至 8000）
+# 前端（開發模式，API 代理至 8085）
 cd frontend
 npm install
 npm run dev

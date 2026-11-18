@@ -14,7 +14,7 @@ Personal, local-only comics library web app. The source of truth for requirement
 
 ## Stack and layout
 - `backend/`: FastAPI + SQLModel (SQLite at `data/library.db`). Modules: `config.py`, `db.py`, `models.py`, `parser.py` (filename parsing), `scanner.py` (background scan), `covers.py` (thumbnails → `data/covers/*.webp`), `launcher.py` (SumatraPDF / Explorer), `routers/`.
-- `frontend/`: React + TypeScript + Vite + Tailwind + shadcn/ui + TanStack Query. In production FastAPI serves `frontend/dist`. In dev, Vite proxies `/api` to `:8000`.
+- `frontend/`: React + TypeScript + Vite + Tailwind + shadcn/ui + TanStack Query. In production FastAPI serves `frontend/dist`. In dev, Vite proxies `/api` to `:8085`.
 - `start.bat`: one-click launcher (ASCII + CRLF, see `.gitattributes`). It creates `.env`, the venv and packages (reinstalling when `requirements.txt` changes), rebuilds the frontend when `frontend/src` is newer than `dist`, picks a free port (it recognises a running instance via `GET /api/health` → `{"app": "comics-library"}`) and opens the browser.
 
 ## Domain model
@@ -27,7 +27,7 @@ Series discovery (`scanner.classify`) walks the folder tree once and recurses:
 
 ## Commands
 ```bash
-.venv\Scripts\python -m uvicorn backend.main:app --reload --port 8000   # backend dev
+.venv\Scripts\python -m uvicorn backend.main:app --reload --port 8085   # backend dev
 .venv\Scripts\python -m pytest backend/tests                             # backend tests
 cd frontend && npm run dev                                               # frontend dev
 cd frontend && npm run build                                             # production build

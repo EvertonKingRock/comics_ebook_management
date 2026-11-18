@@ -50,7 +50,7 @@ if "%NEED_BUILD%"=="1" (
 )
 
 REM --- 4. Pick a port: PORT from .env, else the next free one. If the library already runs, just open it ---
-set PREF=8000
+set PREF=8085
 for /f "tokens=1,* delims==" %%a in ('findstr /b /c:"PORT=" ".env"') do set PREF=%%b
 set /a LAST=%PREF%+9
 set PORT=
