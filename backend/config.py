@@ -46,6 +46,7 @@ class Settings:
     port: int
     category_map: list[tuple[str, str]]  # (folder_name, display_name), ordered
     file_types: set[str] = field(default_factory=set)
+    archive_passwords: list[str] = field(default_factory=list)
     scan_on_startup: bool = True
 
     @property
@@ -86,6 +87,7 @@ def load_settings() -> Settings:
         category_map=categories,
         file_types=types,
         scan_on_startup=_bool(os.getenv("SCAN_ON_STARTUP"), True),
+        archive_passwords=[x.strip() for x in os.getenv("ARCHIVE_PASSWORDS", "").split(",") if x.strip()],
     )
 
 

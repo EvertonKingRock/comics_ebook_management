@@ -111,3 +111,62 @@ def test_missing_files_flagged_not_deleted(client, comics_root):
     scanner.run_scan("incremental")
     s = _series(client, q="H2")["items"][0]
     assert s["is_favorite"] is True  # user data kept across disappearance
+
+
+def _seven_zip():
+    from backend.config import settings
+
+    return settings.sevenzip_path
+
+
+def test_encrypted_and_nested_archives(tmp_path):
+    """Password-protected archives use ARCHIVE_PASSWORDS; archives inside archives are looked into."""
+    import subprocess
+
+    import pytest
+
+    from backend import covers
+    from backend.config import settings
+
+    exe = _seven_zip()
+    if not exe:
+        pytest.skip("7-Zip not installed")
+    from backend.tests.conftest import _png_bytes
+
+    img = tmp_path / "001.png"
+    img.write_bytes(_png_bytes())
+    locked = tmp_path / "locked.7z"
+    subprocess.run([str(exe), "a", "-pqwer", "-mhe=on", str(locked), str(img)], check=True, capture_output=True)
+    inner = tmp_path / "inner.zip"
+    subprocess.run([str(exe), "a", str(inner), str(img)], check=True, capture_output=True)
+    outer = tmp_path / "outer.7z"
+    subprocess.run([str(exe), "a", str(outer), str(inner)], check=True, capture_output=True)
+
+    old = settings.archive_passwords
+    try:
+        settings.archive_passwords = []
+        with pytest.raises(ValueError, match="encrypted"):
+            covers._sevenzip(locked)
+        settings.archive_passwords = ["wrong", "qwer"]
+        assert covers._sevenzip(locked).startswith(b"\x89PNG")
+        assert covers._sevenzip(outer).startswith(b"\x89PNG")
+    finally:
+        settings.archive_passwords = old
+
+
+def test_series_cover_falls_back_to_next_volume(client, comics_root):
+    from backend import scanner
+    from backend.tests.conftest import _make_pdf
+
+    d = comics_root / "TW" / "壞封面測試"
+    d.mkdir()
+    (d / "卷01.pdf").write_bytes(b"%PDF-1.4 broken")
+    _make_pdf(d / "卷02.pdf")
+    scanner.run_scan("incremental")
+    sid = client.get("/api/series", params={"q": "壞封面"}).json()["items"][0]["id"]
+    vols = client.get(f"/api/series/{sid}").json()["volumes"]
+    # first volume fails → the series list should then point at volume 2
+    assert client.get(f"/api/covers/volume/{vols[0]['id']}").status_code == 404
+    s = client.get("/api/series", params={"q": "壞封面"}).json()["items"][0]
+    assert s["cover_volume_id"] == vols[1]["id"]
+    assert client.get(f"/api/covers/volume/{s['cover_volume_id']}").status_code == 200

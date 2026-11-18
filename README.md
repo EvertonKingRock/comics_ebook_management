@@ -54,6 +54,7 @@
 | `CATEGORY_MAP` | 分類資料夾:顯示名稱 | `HK:香港,Japan:日本,TW:台灣,US:美國` |
 | `FILE_TYPES` | 納入管理的副檔名 | `pdf,epub,zip,cbz,rar,cbr,7z,mobi` |
 | `SCAN_ON_STARTUP` | 啟動時自動增量掃描 | `true` |
+| `ARCHIVE_PASSWORDS` | 加密壓縮檔的密碼（逗號分隔），只用於擷取封面 | `qwer` |
 
 更換磁碟機時，只要修改 `COMICS_ROOT` 並重新掃描即可。資料庫以相對路徑記錄檔案，閱讀狀態、評分、標籤等資料會完整保留。
 

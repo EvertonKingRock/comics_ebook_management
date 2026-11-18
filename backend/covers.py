@@ -6,6 +6,7 @@ import logging
 import posixpath
 import re
 import subprocess
+import tempfile
 import threading
 import xml.etree.ElementTree as ET
 import zipfile
@@ -103,27 +104,51 @@ def _zip(path: Path) -> bytes:
         return z.read(imgs[0])
 
 
-def _sevenzip(path: Path) -> bytes:
+ARCHIVE_EXT = (".zip", ".cbz", ".rar", ".cbr", ".7z", ".cb7")
+
+
+def _run7z(args: list[str], timeout: int) -> subprocess.CompletedProcess:
     exe = settings.sevenzip_path
     if not exe:
         raise RuntimeError("7-Zip not found")
-    listing = subprocess.run(
-        [str(exe), "l", "-slt", "-ba", "-sccUTF-8", "-p-", str(path)],
-        capture_output=True, timeout=60, creationflags=CREATE_NO_WINDOW,
-    ).stdout.decode("utf-8", "replace")
-    imgs = sorted(
-        (ln[7:].strip() for ln in listing.splitlines() if ln.startswith("Path = ") and _is_image(ln[7:].strip())),
-        key=natural_key,
-    )
-    if not imgs:
+    return subprocess.run([str(exe), *args], capture_output=True, timeout=timeout, creationflags=CREATE_NO_WINDOW)
+
+
+def _sevenzip(path: Path, depth: int = 0) -> bytes:
+    """First image of a RAR/7Z (or ZIP) archive via the 7-Zip CLI.
+
+    Tries no password first, then each ARCHIVE_PASSWORDS entry (many download-site archives
+    share one, e.g. 'qwer'). If the archive only wraps other archives, looks one level inside.
+    Reads only; inner archives are unpacked to a temp file under data/.
+    """
+    for pw in [None, *settings.archive_passwords]:
+        pflag = "-p-" if pw is None else f"-p{pw}"
+        listed = _run7z(["l", "-slt", "-ba", "-sccUTF-8", pflag, str(path)], 60)
+        names = [ln[7:].strip() for ln in listed.stdout.decode("utf-8", "replace").splitlines() if ln.startswith("Path = ")]
+        if not names:
+            continue  # encrypted headers (or unreadable) — try the next password
+        imgs = sorted((n for n in names if _is_image(n)), key=natural_key)
+        if imgs:
+            got = _run7z(["e", "-so", "-sccUTF-8", pflag, str(path), imgs[0]], 120)
+            if got.returncode == 0 and got.stdout:
+                return got.stdout
+            continue  # encrypted contents and wrong password
+        inner = sorted((n for n in names if n.lower().endswith(ARCHIVE_EXT)), key=natural_key)
+        if inner and depth == 0:
+            got = _run7z(["e", "-so", "-sccUTF-8", pflag, str(path), inner[0]], 600)
+            if got.returncode != 0 or not got.stdout:
+                continue
+            tmp_dir = COVERS_DIR.parent / "tmp"
+            tmp_dir.mkdir(exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=tmp_dir, suffix=Path(inner[0]).suffix, delete=False) as f:
+                f.write(got.stdout)
+                tmp = Path(f.name)
+            try:
+                return _sevenzip(tmp, depth + 1)
+            finally:
+                tmp.unlink(missing_ok=True)
         raise ValueError("no image in archive")
-    out = subprocess.run(
-        [str(exe), "e", "-so", "-sccUTF-8", "-p-", str(path), imgs[0]],
-        capture_output=True, timeout=120, creationflags=CREATE_NO_WINDOW,
-    ).stdout
-    if not out:
-        raise ValueError("extract failed")
-    return out
+    raise ValueError("encrypted archive: no matching password in ARCHIVE_PASSWORDS")
 
 
 def extract_cover(path: Path, ext: str, out: Path) -> dict:
@@ -138,6 +163,8 @@ def extract_cover(path: Path, ext: str, out: Path) -> dict:
         _save_thumb(_zip(path), out)
     elif ext in ("rar", "cbr", "7z", "cb7"):
         _save_thumb(_sevenzip(path), out)
+    elif ext in ("mobi", "azw3", "fb2"):
+        _save_thumb(_pdf(path), out)  # MuPDF renders e-book formats too
     else:
         raise ValueError(f"unsupported cover format: {ext}")
     return meta
@@ -173,17 +200,22 @@ def ensure_cover(volume_id: int) -> Path | None:
 
 # ---------------------------------------------------------------- background worker
 
-def series_cover_volume_ids(session: Session) -> list[int]:
-    """The cover volume of every series: user choice, else first volume by sort key."""
+MAX_COVER_TRIES = 4
+
+
+def series_cover_candidates(session: Session) -> list[list[int]]:
+    """Per series: the user's chosen cover, else its first few volumes in order (fallbacks when one fails)."""
     rows = session.exec(
         select(Volume.series_id, Volume.id).where(col(Volume.is_missing).is_(False)).order_by(Volume.series_id, Volume.sort_key)
     ).all()
-    first: dict[int, int] = {}
+    cands: dict[int, list[int]] = {}
     for sid, vid in rows:
-        first.setdefault(sid, vid)  # type: ignore[arg-type]
-    chosen = dict(session.exec(select(Series.id, Series.cover_volume_id).where(col(Series.cover_volume_id).is_not(None))).all())
-    first.update(chosen)  # type: ignore[arg-type]
-    return list(first.values())
+        lst = cands.setdefault(sid, [])  # type: ignore[arg-type]
+        if len(lst) < MAX_COVER_TRIES:
+            lst.append(vid)  # type: ignore[arg-type]
+    for sid, vid in session.exec(select(Series.id, Series.cover_volume_id).where(col(Series.cover_volume_id).is_not(None))).all():
+        cands[sid] = [vid]  # type: ignore[index,list-item]
+    return list(cands.values())
 
 
 worker_state = {"running": False, "done": 0, "total": 0}
@@ -192,12 +224,16 @@ worker_state = {"running": False, "done": 0, "total": 0}
 def _worker() -> None:
     try:
         with Session(engine) as s:
-            ids = series_cover_volume_ids(s)
-            pending = set(s.exec(select(Volume.id).where(Volume.cover_state == "pending")).all())
-        todo = [i for i in ids if i in pending and not cover_path(i).exists()]
+            groups = series_cover_candidates(s)
+            state = dict(s.exec(select(Volume.id, Volume.cover_state)).all())
+        # Series whose cover isn't settled yet: no candidate is 'ok' and at least one is still pending.
+        todo = [g for g in groups if not any(state.get(v) == "ok" and cover_path(v).exists() for v in g)
+                and any(state.get(v) == "pending" for v in g)]
         worker_state.update(running=True, done=0, total=len(todo))
-        for vid in todo:
-            ensure_cover(vid)
+        for g in todo:
+            for vid in g:
+                if ensure_cover(vid):
+                    break
             worker_state["done"] += 1
     finally:
         worker_state["running"] = False

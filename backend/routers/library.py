@@ -39,7 +39,8 @@ SELECT s.id, s.category_id, c.display_name AS category_name, s.folder_name, s.gr
        s.user_original_title AS original_title,
        s.rating, s.is_favorite,
        COALESCE(s.cover_volume_id,
-         (SELECT v2.id FROM volume v2 WHERE v2.series_id = s.id AND v2.is_missing = 0 ORDER BY v2.sort_key LIMIT 1)
+         (SELECT v2.id FROM volume v2 WHERE v2.series_id = s.id AND v2.is_missing = 0
+          ORDER BY v2.cover_state = 'failed', v2.sort_key LIMIT 1)
        ) AS cover_volume_id,
        a.volume_count, a.read_count, a.reading_count, a.total_size, a.added_at, a.last_opened_at, a.formats,
        CASE WHEN a.read_count = a.volume_count THEN 'read'
