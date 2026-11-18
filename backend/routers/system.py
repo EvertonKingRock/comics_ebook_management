@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,14 +26,27 @@ def _scalar(session: Session, sql: str, **params):
     return session.exec(text(sql), params=params).one()[0]  # type: ignore[call-overload]
 
 
+@router.get("/health")
+def health():
+    """Used by start.bat to recognise this app on a port."""
+    return {"app": "comics-library", "ok": True}
+
+
 # ---------------------------------------------------------------- covers
 
 CACHE = {"Cache-Control": "public, max-age=86400"}
 
 
+# Extraction gets its own small pool so a wall of uncached covers never starves the
+# shared request threadpool (which would stall quick calls like /api/categories).
+_cover_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="cover-req")
+
+
 @router.get("/covers/volume/{volume_id}")
-def volume_cover(volume_id: int):
-    p = covers.ensure_cover(volume_id)
+async def volume_cover(volume_id: int):
+    p = covers.cover_path(volume_id)
+    if not p.exists():
+        p = await asyncio.get_running_loop().run_in_executor(_cover_pool, covers.ensure_cover, volume_id)
     if p is None:
         raise HTTPException(404, "無封面")
     return FileResponse(p, media_type="image/webp", headers=CACHE)

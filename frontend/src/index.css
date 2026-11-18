@@ -1,0 +1,127 @@
+@import "tailwindcss";
+@import "@fontsource/noto-serif-tc/700.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ tokens */
+:root {
+  --paper: #eef0f2;
+  --surface: #ffffff;
+  --surface-2: #f6f7f9;
+  --ink: #1a1f2b;
+  --ink-2: #3c4454;
+  --muted: #5b6473;
+  --rule: #d5d9df;
+  --rule-strong: #b9bfc8;
+  --accent: #0b6fa4;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2eff7;
+  --danger: #b42318;
+  --ok: #1e7a46;
+  --warn: #9a6700;
+
+  /* categories: print-process inks (validated: light + dark, all pairs) */
+  --cat-hk: #c8326e;
+  --cat-jp: #1f8fc4;
+  --cat-tw: #b88a12;
+  --cat-us: #6a55c8;
+
+  color-scheme: light;
+}
+
+.dark {
+  --paper: #13161b;
+  --surface: #1b1f26;
+  --surface-2: #222731;
+  --ink: #e8ebf0;
+  --ink-2: #c3c9d3;
+  --muted: #949cab;
+  --rule: #2e3440;
+  --rule-strong: #434b5a;
+  --accent: #4fb0e3;
+  --accent-ink: #0b1620;
+  --accent-soft: #1b3346;
+  --danger: #f2877d;
+  --ok: #5cc98a;
+  --warn: #e3b341;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+
+  --font-sans: "Microsoft JhengHei UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+  --font-title: "Noto Serif TC", "PMingLiU", "MingLiU", serif;
+  --font-num: "Segoe UI", "Microsoft JhengHei UI", system-ui, sans-serif;
+}
+
+/* ------------------------------------------------------------------ base */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Vertical (直排) spine title on the series page */
+.spine-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-title);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.15;
+}
+
+/* Screentone placeholder for covers that could not be extracted */
+.screentone {
+  background-color: var(--surface-2);
+  background-image: radial-gradient(color-mix(in oklab, var(--tone) 55%, transparent) 1.1px, transparent 1.3px);
+  background-size: 6px 6px;
+}
+
+/* thin scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

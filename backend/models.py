@@ -66,10 +66,10 @@ class Volume(SQLModel, table=True):
     volume_label: str = ""
     volume_no: float | None = None
     sort_key: str = ""
-    read_status: str = Field(default="unread", index=True)  # unread | reading | read
+    read_status: str = "unread"  # unread | reading | read
     last_opened_at: NaiveDatetime | None = None
     cover_state: str = "pending"  # pending | ok | failed
-    is_missing: bool = Field(default=False, index=True)
+    is_missing: bool = False
     added_at: NaiveDatetime = Field(default_factory=now, index=True)
 
 

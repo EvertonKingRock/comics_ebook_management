@@ -20,7 +20,7 @@ NOISE_PATTERNS = [
     for p in [
         r"^kmoe$", r"^kox$", r"^vol\.moe$", r"^mox", r"伊莉", r"分享", r"獨家", r"独家", r"\.com", r"\.net",
         r"tvboxnow", r"^\d{3,5}\s*[x×*]\s*\d{3,5}$", r"^\d+(\.\d+)?\s*[gm]b?$", r"^c\.c$", r"小良家族",
-        r"^dl$", r"下载|下載", r"^v\d+$", r"合集", r"^完整版$", r"高清",
+        r"^dl$", r"下载|下載", r"缺少|断尾|斷尾|^缺", r"^v\d+$", r"合集", r"^完整版$", r"高清",
     ]
 ]
 EDITION_TOKENS = {"中漫版", "港版", "台版", "日版", "繁中版", "原版", "修正版"}
@@ -60,6 +60,8 @@ VOLUME_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 BARE_NUM_RE = re.compile(r"(?<![\d.])" + NUM + r"(?![\d.])")
 SPECIAL_VOLUME_RE = re.compile(r"全一[冊册卷集]|[上中下][冊册卷集]|上篇|中篇|下篇|前篇|後篇|后篇|番外|特別篇|特别篇|外傳|外传|上\s*\+\s*下")
 
+
+_VOLUME_DESC_RE = re.compile(r"(?i)(?:[\d\s\-~～、,，+&]|全|第|卷|集|冊|册|話|话|回|期|部|vol\.?|end|完)+")
 
 # ---------------------------------------------------------------- helpers
 
@@ -154,11 +156,17 @@ def parse_series_name(name: str) -> SeriesInfo:
             status, total = st, n
             rest = _clean(FINISHED_RE.sub("", rest))
     rest = re.sub(r"[（(]\s*[）)]$", "", rest).strip()
-    # A bare volume count like '48集' / '36卷' is a total, not a title.
-    m = re.fullmatch(r"(?:全)?\s*(\d+)\s*[集卷冊册話话期]", rest)
-    if m:
-        total = total or int(m.group(1))
+    # Text that only describes which volumes are held ('48集', '01-18End', '1-3卷、7-33回')
+    # is not a title. A trailing 'End'/'完' still marks the series as finished.
+    if rest and _VOLUME_DESC_RE.fullmatch(rest):
+        nums = [int(n) for n in re.findall(r"\d+", rest)]
+        if re.search(r"(?i)end|完", rest):
+            status = "finished"
+        if len(nums) == 1 or re.search(r"(?i)end|完", rest):
+            total = total or (nums[-1] if nums else None)
         rest = ""
+    # Ordering prefixes such as '1.1 課長島耕作' / '1.10.1 學生島耕作就活篇'
+    rest = re.sub(r"^\d+(?:\.\d+)+\s+", "", rest)
 
     author = None
     if rest:

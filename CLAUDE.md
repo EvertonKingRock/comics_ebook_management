@@ -15,10 +15,15 @@ Personal, local-only comics library web app. The source of truth for requirement
 ## Stack and layout
 - `backend/`: FastAPI + SQLModel (SQLite at `data/library.db`). Modules: `config.py`, `db.py`, `models.py`, `parser.py` (filename parsing), `scanner.py` (background scan), `covers.py` (thumbnails → `data/covers/*.webp`), `launcher.py` (SumatraPDF / Explorer), `routers/`.
 - `frontend/`: React + TypeScript + Vite + Tailwind + shadcn/ui + TanStack Query. In production FastAPI serves `frontend/dist`. In dev, Vite proxies `/api` to `:8000`.
-- `start.bat`: one-click launcher (creates the venv, installs deps, builds the frontend if needed, runs the server, opens the browser).
+- `start.bat`: one-click launcher (ASCII + CRLF, see `.gitattributes`). It creates `.env`, the venv and packages (reinstalling when `requirements.txt` changes), rebuilds the frontend when `frontend/src` is newer than `dist`, picks a free port (it recognises a running instance via `GET /api/health` → `{"app": "comics-library"}`) and opens the browser.
 
 ## Domain model
-Category (top-level folder, mapped via `CATEGORY_MAP`) → Series (2nd-level folder; a loose file in a category folder becomes a single-volume series) → Volume (file). Supported extensions come from `FILE_TYPES`.
+Category (top-level folder, mapped via `CATEGORY_MAP`) → Series → Volume (file). Supported extensions come from `FILE_TYPES`.
+
+Series discovery (`scanner.classify`) walks the folder tree once and recurses:
+- A folder with ≤1 sub-folder holding comics, or whose sub-folders are all volume folders (`Vol_01`, `000-100`) or format variants (`ePub`, `PDF格式`; see `is_generic_dir`), is **one series**.
+- Otherwise it is an **author/collection folder**. Each sub-folder is classified again, and loose files are grouped by `parser.loose_title` into virtual series whose `rel_path` is `<folder>/*<title>` (`*` can't occur in Windows paths). The top-level container name becomes `group_name` and the default author, unless it is a franchise name contained in the series name.
+- Multi-part RARs only keep `.part1`.
 
 ## Commands
 ```bash
@@ -27,6 +32,10 @@ Category (top-level folder, mapped via `CATEGORY_MAP`) → Series (2nd-level fol
 cd frontend && npm run dev                                               # frontend dev
 cd frontend && npm run build                                             # production build
 ```
+
+## Performance gotchas
+- SQLite picked low-selectivity indexes (`is_missing`) and turned joins into full scans (10 s queries). Keep the composite `ix_volume_series_present (series_id, is_missing, sort_key)` and run `db.analyze()` after scans. Don't add `index=True` to boolean or status columns.
+- Cover extraction runs in its own small thread pool (`routers/system.py`), so uncached covers can't starve the shared FastAPI threadpool.
 
 ## Conventions
 - Keep the parser pure and unit-tested (`backend/tests/test_parser.py`) with real-world filename samples.

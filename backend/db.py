@@ -28,7 +28,19 @@ def init_db() -> None:
     from . import models  # noqa: F401  (register tables)
 
     SQLModel.metadata.create_all(engine)
+    with engine.begin() as conn:
+        # Low-selectivity indexes made SQLite scan every volume per series (10 s queries).
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_volume_is_missing")
+        conn.exec_driver_sql("DROP INDEX IF EXISTS ix_volume_read_status")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_volume_series_present ON volume (series_id, is_missing, sort_key)")
+    analyze()
     sync_categories()
+
+
+def analyze() -> None:
+    """Refresh the query planner's statistics (cheap; run after scans)."""
+    with engine.begin() as conn:
+        conn.exec_driver_sql("ANALYZE")
 
 
 def sync_categories() -> None:

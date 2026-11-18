@@ -15,7 +15,7 @@ from pathlib import Path
 from sqlmodel import Session, select
 
 from .config import settings
-from .db import engine
+from .db import analyze, engine
 from .models import Category, ScanLog, Series, Volume, now
 from .parser import loose_title, natural_key_str, parse_series_name, parse_volume, split_ext
 
@@ -188,6 +188,9 @@ def discover_category(cat_dir: str, root: str) -> list[FoundSeries]:
 
 def _apply_series_parse(s: Series, fs: FoundSeries) -> None:
     info = parse_series_name(fs.folder_name)
+    if info.author and fs.group_name and info.title == fs.group_name:
+        # '[千葉徹彌][好小子]' inside folder 千葉徹彌 → the first token was the author.
+        info.title, info.author = info.author, info.title
     s.folder_name = fs.folder_name
     s.group_name = fs.group_name
     s.auto_title = info.title
@@ -227,6 +230,7 @@ def run_scan(mode: str = "incremental") -> None:
         state.phase, state.total = "syncing", len(found)
         state.message = "更新資料庫…"
         added, updated, missing = _sync(found, full=(mode == "full"))
+        analyze()
 
         with Session(engine) as session:
             sl = session.get(ScanLog, state.last_log_id)
